@@ -39,7 +39,7 @@ use super::{
 /// let mut node_table = NodeTable::new();
 /// let mut node = DefaultNode::with_action(
 ///     NodeName::from(node_name),
-///     Box::new(EmptyAction),
+///     EmptyAction,
 ///     &mut node_table,
 /// );
 /// ```
@@ -90,16 +90,20 @@ impl DefaultNode {
 
     pub fn with_action(
         name: NodeName,
-        action: Box<dyn Action>,
+        action: impl Action + 'static,
         node_table: &mut NodeTable,
     ) -> Self {
         Self {
             id: node_table.alloc_id_for(&name),
             name,
-            action,
+            action: Box::new(action),
             in_channels: InChannels::default(),
             out_channels: OutChannels::default(),
         }
+    }
+
+    pub fn set_action(&mut self, action: impl Action + 'static) {
+        self.action = Box::new(action)
     }
 }
 
@@ -125,8 +129,8 @@ mod test_default_node {
     }
 
     impl HelloAction {
-        pub fn new() -> Box<Self> {
-            Box::new(Self::default())
+        pub fn new() -> Self {
+            Self::default()
         }
     }
 

@@ -1,10 +1,4 @@
-use std::sync::Arc;
-
-use dagrs::{
-    auto_node, dependencies,
-    graph::{self, graph::Graph},
-    EmptyAction, EnvVar, InChannels, Node, NodeTable, OutChannels,
-};
+use dagrs::{auto_node, dependencies, EmptyAction, InChannels, Node, NodeTable, OutChannels};
 
 #[auto_node]
 struct MyNode {/*Put customized fields here.*/}
@@ -37,8 +31,9 @@ fn main() {
         output_channels: OutChannels::default(),
         action: Box::new(EmptyAction),
     };
-    let mut g = dependencies!(s -> a b,
-     b -> a
+    let mut g = dependencies!(
+        s -> a b,
+        b -> a
     );
 
     g.run();

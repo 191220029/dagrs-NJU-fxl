@@ -1,5 +1,4 @@
 use std::hash::Hash;
-use std::sync::mpsc::channel;
 use std::{
     collections::{HashMap, HashSet},
     panic::{self, AssertUnwindSafe},
@@ -74,7 +73,8 @@ impl Graph {
     }
 
     /// Adds a new node to the `Graph`
-    pub fn add_node(&mut self, node: Box<dyn Node>) {
+    pub fn add_node(&mut self, node: impl Node + 'static) {
+        let node = Box::new(node);
         self.node_count = self.node_count + 1;
         let id = node.id();
         self.nodes.insert(id, node);
@@ -154,7 +154,7 @@ impl Graph {
     }
 
     /// Initializes the network, setting up the nodes.
-    pub fn init(&mut self) {
+    pub(crate) fn init(&mut self) {
         self.execute_states.reserve(self.nodes.len());
         self.nodes.values().for_each(|node| {
             self.execute_states
@@ -227,7 +227,7 @@ impl Graph {
             processed_count += 1;
             let node = self.nodes.get_mut(&node_id).unwrap();
             let out = node.output_channels();
-            for (id, channel) in out.0.iter() {
+            for (id, _channel) in out.0.iter() {
                 if let Some(degree) = in_degree.get_mut(id) {
                     *degree -= 1;
                     if *degree == 0 {
@@ -298,8 +298,8 @@ mod tests {
     }
 
     impl HelloAction {
-        pub fn new() -> Box<Self> {
-            Box::new(Self::default())
+        pub fn new() -> Self {
+            Self::default()
         }
     }
 
@@ -331,8 +331,8 @@ mod tests {
         );
         let node1_id = node1.id();
 
-        graph.add_node(Box::new(node));
-        graph.add_node(Box::new(node1));
+        graph.add_node(node);
+        graph.add_node(node1);
 
         graph.add_edge(node_id, vec![node1_id]);
 

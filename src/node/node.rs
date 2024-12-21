@@ -56,10 +56,12 @@ impl NodeTable {
         id
     }
 
+    /// Get the [`NodeId`] of the node corresponding to its name.
     pub fn get(&self, name: &str) -> Option<&NodeId> {
         self.0.get(name)
     }
 
+    /// Create an empty [`NodeTable`].
     pub fn new() -> Self {
         Self::default()
     }
