@@ -29,7 +29,8 @@ impl InChannels {
         }
     }
 
-    /// ...
+    /// Calls `blocking_recv` for all the [`InChannel`]s, and applies transformation `f` to
+    /// the return values of the call.
     pub fn blocking_map<F, T>(&mut self, mut f: F) -> Vec<T>
     where
         F: FnMut(Result<Content, RecvErr>) -> T,
@@ -40,7 +41,8 @@ impl InChannels {
             .collect()
     }
 
-    /// ...
+    /// Calls `recv` for all the [`InChannel`]s, and applies transformation `f` to
+    /// the return values of the call asynchronously.
     pub async fn map<F, T>(&mut self, mut f: F) -> Vec<T>
     where
         F: FnMut(Result<Content, RecvErr>) -> T,

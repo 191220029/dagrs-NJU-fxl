@@ -30,6 +30,7 @@ impl OutChannels {
         }
     }
 
+    /// Broadcasts the `content` to all the [`OutChannel`]s asynchronously.
     pub async fn broadcast(&self, content: Content) -> Vec<Result<(), SendErr>> {
         let futures = self
             .0
@@ -39,6 +40,7 @@ impl OutChannels {
         join_all(futures).await
     }
 
+    /// Blocking broadcasts the `content` to all the [`OutChannel`]s.
     pub fn blocking_broadcast(&self, content: Content) -> Vec<Result<(), SendErr>> {
         self.0
             .iter()
