@@ -1,6 +1,6 @@
 //! # Example: hello_dagrs
 //! Creates a `DefaultNode` that returns with "Hello Dagrs",
-//! then create a new `Graph` with this node and run.
+//! add this node to a new `Graph` and run.
 
 use std::sync::Arc;
 
@@ -9,7 +9,6 @@ use dagrs::{
     Action, Content, DefaultNode, EnvVar, Graph, InChannels, Node, NodeTable, OutChannels, Output,
 };
 
-/// An implementation of [`Action`] that returns [`Output::Out`] containing a String "Hello world".
 #[derive(Default)]
 pub struct HelloAction;
 #[async_trait]
@@ -20,22 +19,17 @@ impl Action for HelloAction {
 }
 
 fn main() {
-    // create an empty `NodeTable`
     let mut node_table = NodeTable::new();
-    // create a `DefaultNode` with action `HelloAction`
     let hello_node = DefaultNode::with_action(
         "Hello Dagrs".to_string(),
         HelloAction::default(),
         &mut node_table,
     );
     let id: &dagrs::NodeId = &hello_node.id();
-
-    // create a graph with this node and run
     let mut graph = Graph::new();
     graph.add_node(hello_node);
     graph.run();
 
-    // verify the output of this node
     let outputs = graph.get_outputs();
     assert_eq!(outputs.len(), 1);
 

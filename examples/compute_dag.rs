@@ -38,7 +38,6 @@ impl Action for Compute {
             .for_each(|x| sum += *x * base);
 
         out_channels.broadcast(Content::new(sum)).await;
-
         Output::Out(Some(Content::new(sum)))
     }
 }
@@ -93,12 +92,12 @@ fn main() {
     graph.set_env(env);
 
     // Start executing this dag
-    graph.run();
+    graph.start();
 
     // Get execution result.
     let res = graph
         .get_results::<usize>()
-        .get(&g_id)
+        .get(&f_id)
         .unwrap()
         .clone()
         .unwrap();

@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
+
 use crate::{
     connection::{in_channel::InChannels, out_channel::OutChannels},
     utils::{env::EnvVar, output::Output},
@@ -50,7 +52,7 @@ pub struct DefaultNode {
     in_channels: InChannels,
     out_channels: OutChannels,
 }
-
+#[async_trait]
 impl Node for DefaultNode {
     fn id(&self) -> NodeId {
         self.id
@@ -68,12 +70,10 @@ impl Node for DefaultNode {
         &mut self.out_channels
     }
 
-    fn run(&mut self, env: Arc<EnvVar>) -> Output {
-        tokio::runtime::Runtime::new().unwrap().block_on(async {
-            self.action
-                .run(&mut self.in_channels, &self.out_channels, env)
-                .await
-        })
+    async fn run(&mut self, env: Arc<EnvVar>) -> Output {
+        self.action
+            .run(&mut self.in_channels, &self.out_channels, env)
+            .await
     }
 }
 
@@ -154,7 +154,9 @@ mod test_default_node {
         assert_eq!(node_table.get(node_name).unwrap(), &node.id());
 
         let env = Arc::new(EnvVar::new(node_table));
-        let out = node.run(env).get_out().unwrap();
+        let out = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(async { node.run(env).await.get_out().unwrap() });
         let out: &String = out.get().unwrap();
         assert_eq!(out, "Hello world");
     }
