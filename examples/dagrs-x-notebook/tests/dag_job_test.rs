@@ -9,10 +9,10 @@ const PARSER: YamlParser = YamlParser;
 
 #[test]
 fn yaml_task_correct_execute() {
-    let mut job = PARSER
+    let (mut job, _) = PARSER
         .parse_tasks("tests/config/correct.yaml", HashMap::new())
         .unwrap();
-    job.start();
+    job.start().unwrap();
 }
 
 // #[test]

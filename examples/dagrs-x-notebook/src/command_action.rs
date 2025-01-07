@@ -6,13 +6,15 @@ use dagrs::{Action, Content, Output};
 /// [`CommandAction`] is a specific implementation of [`Complex`], used to execute operating system commands.
 pub struct CommandAction {
     command: String,
+    args: Vec<String>,
 }
 
 impl CommandAction {
     #[allow(unused)]
-    pub fn new(cmd: &str) -> Self {
+    pub fn new(cmd: &str, args: Vec<String>) -> Self {
         Self {
             command: cmd.to_owned(),
+            args,
         }
     }
 }
@@ -45,6 +47,7 @@ impl Action for CommandAction {
                 }
             })
             .await;
+        args.append(&mut self.args.iter().map(|s| s.as_str()).collect());
         args.append(&mut inputs.iter().map(|x| x.as_str()).collect());
 
         log::info!("cmd: {:?}, args: {:?}", cmd.get_program(), args);
@@ -75,8 +78,10 @@ impl Action for CommandAction {
             }
         };
         if out.status.success() {
-            out_channels.broadcast(Content::new((stdout, stderr))).await;
-            Output::new(())
+            out_channels
+                .broadcast(Content::new((stdout.clone(), stderr.clone())))
+                .await;
+            Output::new((stdout.clone(), stderr.clone()))
         } else {
             out_channels
                 .broadcast(Content::new((stdout.clone(), stderr.clone())))

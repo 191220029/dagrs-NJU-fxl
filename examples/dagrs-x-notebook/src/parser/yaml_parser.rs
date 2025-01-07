@@ -52,7 +52,7 @@ impl YamlParser {
                 id,
                 precursors,
                 name,
-                Box::new(CommandAction::new(cmd)),
+                Box::new(CommandAction::new(cmd, vec![])),
                 node_table,
             ))
         }
@@ -64,7 +64,7 @@ impl Parser for YamlParser {
         &self,
         file: &str,
         specific_actions: HashMap<String, Box<dyn Action>>,
-    ) -> Result<Graph, ParseError> {
+    ) -> Result<(Graph, EnvVar), ParseError> {
         let content = load_file(file).map_err(|e| ParseError(e.to_string()))?;
         self.parse_tasks_from_str(&content, specific_actions)
     }
@@ -73,7 +73,7 @@ impl Parser for YamlParser {
         &self,
         content: &str,
         mut specific_actions: HashMap<String, Box<dyn Action>>,
-    ) -> Result<Graph, ParseError> {
+    ) -> Result<(Graph, EnvVar), ParseError> {
         let mut node_table = NodeTable::default();
         // Parse Yaml
         let yaml_tasks =
@@ -126,8 +126,10 @@ impl Parser for YamlParser {
         edges.into_iter().for_each(|(x, ys)| {
             dag.add_edge(x, ys);
         });
-        dag.set_env(EnvVar::new(node_table));
 
-        Ok(dag)
+        let env_var = EnvVar::new(node_table);
+        dag.set_env(env_var.clone());
+
+        Ok((dag, env_var))
     }
 }

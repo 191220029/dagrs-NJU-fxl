@@ -1,7 +1,7 @@
 //! Task configuration file parser interface
 use std::collections::HashMap;
 
-use dagrs::{Action, Graph};
+use dagrs::{Action, EnvVar, Graph};
 
 /// Generic parser traits. If users want to customize the configuration file parser, they must implement this trait.
 /// The yaml module's `YamlParser` is an example.
@@ -24,13 +24,13 @@ pub trait Parser {
         &self,
         file: &str,
         specific_actions: HashMap<String, Box<dyn Action>>,
-    ) -> Result<Graph, ParseError>;
+    ) -> Result<(Graph, EnvVar), ParseError>;
 
     fn parse_tasks_from_str(
         &self,
         content: &str,
         specific_actions: HashMap<String, Box<dyn Action>>,
-    ) -> Result<Graph, ParseError>;
+    ) -> Result<(Graph, EnvVar), ParseError>;
 }
 
 #[allow(unused)]
