@@ -1,11 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
+use async_trait::async_trait;
 use futures::future::join_all;
 use tokio::sync::{broadcast, mpsc, Mutex};
 
 use crate::node::node::NodeId;
 
-use super::information_packet::Content;
+use super::information_packet::{Content, TypedContent};
 
 /// # Output Channels
 /// A hash-table mapping `NodeId` to `OutChannel`. In **Dagrs**, each `Node` stores output
@@ -123,4 +124,150 @@ impl OutChannel {
 pub enum SendErr {
     NoSuchChannel,
     ClosedChannel(Content),
+}
+
+#[async_trait]
+pub(crate) trait OutChnl {
+    type Packet;
+
+    fn blocking_send(&self, value: Self::Packet) -> Result<(), SendErr>;
+    async fn send(&self, value: Self::Packet) -> Result<(), SendErr>;
+}
+
+#[async_trait]
+impl OutChnl for OutChannel {
+    type Packet = Content;
+
+    fn blocking_send(&self, value: Self::Packet) -> Result<(), SendErr> {
+        match self {
+            OutChannel::Mpsc(sender) => match sender.blocking_send(value) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(e.0)),
+            },
+            OutChannel::Bcst(sender) => match sender.send(value) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(e.0)),
+            },
+        }
+    }
+
+    async fn send(&self, value: Self::Packet) -> Result<(), SendErr> {
+        match self {
+            OutChannel::Mpsc(sender) => match sender.send(value).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(e.0)),
+            },
+            OutChannel::Bcst(sender) => match sender.send(value) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(e.0)),
+            },
+        }
+    }
+}
+
+/// # Typed Output Channel
+/// Wrapper of senders of `tokio::sync::mpsc` and `tokio::sync::broadcast` with specific type.
+/// This provides type-safe channel communication.
+pub enum TypedOutChannel<T: Send + Sync + 'static> {
+    /// Sender of a `tokio::sync::mpsc` channel with specific type.
+    Mpsc(mpsc::Sender<TypedContent<T>>),
+    /// Sender of a `tokio::sync::broadcast` channel with specific type.
+    Bcst(broadcast::Sender<TypedContent<T>>),
+}
+
+#[async_trait]
+impl<T: Send + Sync + 'static> OutChnl for TypedOutChannel<T> {
+    type Packet = TypedContent<T>;
+
+    fn blocking_send(&self, value: Self::Packet) -> Result<(), SendErr> {
+        match self {
+            TypedOutChannel::Mpsc(sender) => match sender.blocking_send(value) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(Content::new(e.0))),
+            },
+            TypedOutChannel::Bcst(sender) => match sender.send(value) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(Content::new(e.0))),
+            },
+        }
+    }
+
+    async fn send(&self, value: Self::Packet) -> Result<(), SendErr> {
+        match self {
+            TypedOutChannel::Mpsc(sender) => match sender.send(value).await {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(Content::new(e.0))),
+            },
+            TypedOutChannel::Bcst(sender) => match sender.send(value) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(SendErr::ClosedChannel(Content::new(e.0))),
+            },
+        }
+    }
+}
+
+/// # Typed Output Channels
+/// A hash-table mapping `NodeId` to `TypedOutChannel`. This provides type-safe channel communication
+/// between nodes.
+#[derive(Default)]
+pub struct TypedOutChannels<T: Send + Sync + 'static>(
+    pub(crate) HashMap<NodeId, Arc<Mutex<TypedOutChannel<T>>>>,
+);
+
+impl<T: Send + Sync + 'static> TypedOutChannels<T> {
+    /// Perform a blocking send on the outcoming channel from `NodeId`.
+    pub fn blocking_send_to(&self, id: &NodeId, content: TypedContent<T>) -> Result<(), SendErr> {
+        match self.get(id) {
+            Some(channel) => channel.blocking_lock().blocking_send(content),
+            None => Err(SendErr::NoSuchChannel),
+        }
+    }
+
+    /// Perform a asynchronous send on the outcoming channel from `NodeId`.
+    pub async fn send_to(&self, id: &NodeId, content: TypedContent<T>) -> Result<(), SendErr> {
+        match self.get(id) {
+            Some(channel) => channel.lock().await.send(content).await,
+            None => Err(SendErr::NoSuchChannel),
+        }
+    }
+
+    /// Broadcasts the `content` to all the [`TypedOutChannel`]s asynchronously.
+    pub async fn broadcast(&self, content: TypedContent<T>) -> Vec<Result<(), SendErr>> {
+        let futures = self
+            .0
+            .iter()
+            .map(|(_, c)| async { c.lock().await.send(content.clone()).await });
+
+        join_all(futures).await
+    }
+
+    /// Blocking broadcasts the `content` to all the [`TypedOutChannel`]s.
+    pub fn blocking_broadcast(&self, content: TypedContent<T>) -> Vec<Result<(), SendErr>> {
+        self.0
+            .iter()
+            .map(|(_, c)| c.blocking_lock().blocking_send(content.clone()))
+            .collect()
+    }
+
+    /// Close the channel by the given `NodeId`, and remove the channel in this map.
+    pub fn close(&mut self, id: &NodeId) {
+        if let Some(_) = self.get(id) {
+            self.0.remove(id);
+        }
+    }
+
+    pub(crate) fn close_all(&mut self) {
+        self.0.clear();
+    }
+
+    fn get(&self, id: &NodeId) -> Option<Arc<Mutex<TypedOutChannel<T>>>> {
+        match self.0.get(id) {
+            Some(c) => Some(c.clone()),
+            None => None,
+        }
+    }
+
+    pub(crate) fn insert(&mut self, node_id: NodeId, channel: Arc<Mutex<TypedOutChannel<T>>>) {
+        self.0.insert(node_id, channel);
+    }
 }
